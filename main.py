@@ -6,6 +6,13 @@ import schemas
 from datetime import datetime, timedelta
 from auth import verify_api_key
 
+# SlowApi
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+# Initialize Rate Limiter tracking by client IP address
+limiter = Limiter(key_func=get_remote_address)
 
 # Create database tables on startup
 Base.metadata.create_all(bind=engine)
@@ -16,6 +23,10 @@ app = FastAPI(
     version="1.0.0",
     dependencies=[Depends(verify_api_key)]
 )
+
+# Attach rate limiter state and exception handler to FastAPI app
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.get("/")
 def read_root():
@@ -48,6 +59,7 @@ def list_available_slots(db: Session = Depends(get_db)):
 
 
 @app.post("/bookings", response_model=schemas.BookingResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 def create_booking(
     booking_in: schemas.BookingCreate, 
     db: Session = Depends(get_db),
