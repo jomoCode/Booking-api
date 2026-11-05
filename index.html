@@ -135,7 +135,7 @@
           </div>
 
           <!-- NAVIGATION TABS -->
-          <nav class="flex border-t border-slate-200 mt-2">
+          <nav class="flex overflow-x-auto border-t border-slate-200 mt-2">
             <button
               @click="activeTab = 'booking'"
               :class="activeTab === 'booking' ? 'border-b-2 border-teal-600 text-slate-900 bg-teal-50 font-black' : 'border-b-2 border-transparent text-slate-600 hover:text-slate-900 font-bold hover:bg-slate-100'"
@@ -561,34 +561,103 @@
                 </button>
               </div>
 
-              <!-- RESET DEMO STATE CARD -->
-              <div
-                class="border border-teal-500 bg-teal-50/50 p-6 flex flex-col justify-between"
+              <!-- CONFIGURE APPOINTMENT SCHEDULE -->
+              <form
+                @submit.prevent="replaceSchedule"
+                class="border border-teal-500 bg-teal-50/50 p-6 md:col-span-2"
               >
-                <div>
+                <div class="mb-5">
                   <div
                     class="w-10 h-10 bg-teal-600 text-white flex items-center justify-center font-black text-xl mb-4"
                   >
-                    🔄
+                    +
                   </div>
                   <h3 class="text-xl font-black text-slate-900 uppercase">
-                    RESET DEMO ENVIRONMENT
+                    CONFIGURE APPOINTMENT SLOTS
                   </h3>
                   <p
                     class="text-xs font-bold text-slate-700 mt-2 leading-relaxed"
                   >
-                    Restores the initial set of demo appointment slots (Monday,
-                    Wednesday, Friday slots) and flushes local changes.
+                    Add as many appointment windows as needed. Replacing the
+                    schedule permanently deletes all existing bookings.
                   </p>
                 </div>
 
-                <button
-                  @click="resetDemoState"
-                  class="mt-6 w-full bg-teal-600 hover:bg-teal-700 text-white font-black py-3 px-4 uppercase text-xs tracking-wider border border-teal-800 shadow-sm transition-all"
+                <div class="space-y-3">
+                  <div
+                    v-for="(scheduleSlot, index) in scheduleSlots"
+                    :key="scheduleSlot.key"
+                    class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end border border-slate-300 bg-white p-4"
+                  >
+                    <div>
+                      <label
+                        :for="`slot-start-${scheduleSlot.key}`"
+                        class="block text-xs font-black uppercase text-slate-700 mb-1"
+                      >
+                        Slot {{ index + 1 }} Start
+                      </label>
+                      <input
+                        :id="`slot-start-${scheduleSlot.key}`"
+                        v-model="scheduleSlot.start_time"
+                        type="datetime-local"
+                        required
+                        class="w-full min-w-0 border border-slate-300 px-3 py-2 font-bold text-slate-900 bg-white focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        :for="`slot-end-${scheduleSlot.key}`"
+                        class="block text-xs font-black uppercase text-slate-700 mb-1"
+                      >
+                        Slot {{ index + 1 }} End
+                      </label>
+                      <input
+                        :id="`slot-end-${scheduleSlot.key}`"
+                        v-model="scheduleSlot.end_time"
+                        type="datetime-local"
+                        required
+                        class="w-full min-w-0 border border-slate-300 px-3 py-2 font-bold text-slate-900 bg-white focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      @click="removeScheduleSlot(index)"
+                      :disabled="scheduleSlots.length === 1"
+                      :aria-label="`Remove slot ${index + 1}`"
+                      title="Remove slot"
+                      class="h-10 border border-red-300 bg-red-50 px-4 font-black text-red-700 hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
                 >
-                  Reset Demo State
+                  <button
+                    type="button"
+                    @click="addScheduleSlot"
+                    class="border border-slate-700 bg-white px-4 py-2.5 text-xs font-black uppercase tracking-wider text-slate-900 hover:bg-slate-100"
+                  >
+                    + Add Another Slot
+                  </button>
+                  <span class="text-xs font-bold uppercase text-slate-600">
+                    {{ scheduleSlots.length }} slot(s) configured
+                  </span>
+                </div>
+
+                <button
+                  type="submit"
+                  :disabled="resettingSlots"
+                  class="mt-5 w-full bg-teal-600 hover:bg-teal-700 text-white font-black py-3 px-4 uppercase text-xs tracking-wider border border-teal-800 shadow-sm transition-all disabled:cursor-wait disabled:opacity-50"
+                >
+                  <span v-if="resettingSlots">Replacing Schedule...</span>
+                  <span v-else
+                    >Replace Schedule and Clear Existing Bookings</span
+                  >
                 </button>
-              </div>
+              </form>
             </div>
 
             <!-- AUDIT / SYSTEM STATUS LOG -->
@@ -761,6 +830,7 @@
       createApp({
         setup() {
           const API_BASE = "http://127.0.0.1:8000";
+          const ADMIN_API_KEY = "my-secret-clinic-key-123";
 
           // Navigation tab state: 'booking' | 'lookup' | 'admin'
           const activeTab = ref("booking");
@@ -785,6 +855,9 @@
           // Lookup by ID state
           const lookupId = ref("");
           const lookedUpBooking = ref(null);
+          const resettingSlots = ref(false);
+          const nextScheduleSlotKey = ref(2);
+          const scheduleSlots = ref([{ key: 1, start_time: "", end_time: "" }]);
 
           // Initial Mock Slots generator
           const mockSlots = [
@@ -840,10 +913,13 @@
           ];
 
           // Headers generator with optional Idempotency Key
-          const getHeaders = (idempotencyKey = null) => {
+          const getHeaders = (idempotencyKey = null, apiKey = null) => {
             const headers = { "Content-Type": "application/json" };
             if (idempotencyKey) {
               headers["Idempotency-Key"] = idempotencyKey;
+            }
+            if (apiKey) {
+              headers["x-api-key"] = apiKey;
             }
             return headers;
           };
@@ -1040,16 +1116,92 @@
             messageType.value = "success";
           };
 
-          // Reset Demo State
-          const resetDemoState = () => {
-            slots.value = [...mockSlots];
-            allBookings.value = [...mockBookings];
-            lookedUpBooking.value = null;
-            lookupId.value = "";
-            searchEmail.value = "";
-            slotSearchQuery.value = "";
-            message.value = "Demo state successfully reset to default.";
-            messageType.value = "success";
+          const addScheduleSlot = () => {
+            scheduleSlots.value.push({
+              key: nextScheduleSlotKey.value++,
+              start_time: "",
+              end_time: "",
+            });
+          };
+
+          const removeScheduleSlot = (index) => {
+            if (scheduleSlots.value.length > 1) {
+              scheduleSlots.value.splice(index, 1);
+            }
+          };
+
+          const replaceSchedule = async () => {
+            const configuredSlots = scheduleSlots.value.map((slot) => ({
+              start: new Date(slot.start_time),
+              end: new Date(slot.end_time),
+            }));
+            if (
+              configuredSlots.some(
+                (slot) =>
+                  Number.isNaN(slot.start.getTime()) ||
+                  Number.isNaN(slot.end.getTime()) ||
+                  slot.end <= slot.start,
+              )
+            ) {
+              message.value =
+                "Each slot must have a valid end time after its start time.";
+              messageType.value = "error";
+              return;
+            }
+
+            const orderedSlots = [...configuredSlots].sort(
+              (first, second) => first.start - second.start,
+            );
+            if (
+              orderedSlots.some(
+                (slot, index) =>
+                  index > 0 && slot.start < orderedSlots[index - 1].end,
+              )
+            ) {
+              message.value = "Appointment time frames cannot overlap.";
+              messageType.value = "error";
+              return;
+            }
+
+            if (
+              !window.confirm(
+                "Replacing the schedule permanently deletes all existing bookings. Continue?",
+              )
+            ) {
+              return;
+            }
+
+            resettingSlots.value = true;
+            try {
+              const response = await fetch(`${API_BASE}/slots/reset`, {
+                method: "POST",
+                headers: getHeaders(null, ADMIN_API_KEY),
+                body: JSON.stringify({
+                  slots: orderedSlots.map((slot) => ({
+                    start_time: slot.start.toISOString(),
+                    end_time: slot.end.toISOString(),
+                  })),
+                }),
+              });
+              const result = await response.json().catch(() => ({}));
+              if (!response.ok) {
+                throw new Error(
+                  result.detail || "The schedule could not be replaced.",
+                );
+              }
+
+              slots.value = result;
+              allBookings.value = [];
+              lookedUpBooking.value = null;
+              message.value = `Schedule replaced with ${result.length} appointment slot(s).`;
+              messageType.value = "success";
+            } catch (error) {
+              message.value =
+                error.message || "The schedule could not be replaced.";
+              messageType.value = "error";
+            } finally {
+              resettingSlots.value = false;
+            }
           };
 
           onMounted(() => {
@@ -1081,7 +1233,11 @@
             lookupBooking,
             cancelBooking,
             purgeAllBookings,
-            resetDemoState,
+            resettingSlots,
+            scheduleSlots,
+            addScheduleSlot,
+            removeScheduleSlot,
+            replaceSchedule,
           };
         },
       }).mount("#app");
