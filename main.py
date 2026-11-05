@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Query, Header
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db, SessionLocal
 import models
@@ -88,6 +88,21 @@ def create_booking(
     db.refresh(db_booking)
     return db_booking
 
+
+@app.get("/bookings", response_model=list[schemas.BookingResponse])
+def list_bookings(
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(10, ge=1, le=100, description="Max number of records to return"),
+    email: str | None = Query(default=None, description="Filter bookings by patient email"),
+    db: Session = Depends(get_db)
+):
+    """List bookings with pagination and optional email filter."""
+    query = db.query(models.Booking)
+    if email:
+        query = query.filter(models.Booking.patient_email == email)
+    
+    bookings = query.offset(skip).limit(limit).all()
+    return bookings
 
 @app.get("/bookings/{booking_id}", response_model=schemas.BookingResponse)
 def get_booking(booking_id: int, db: Session = Depends(get_db)):
