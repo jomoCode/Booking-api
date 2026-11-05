@@ -84,3 +84,21 @@ def get_booking(booking_id: int, db: Session = Depends(get_db)):
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     return booking
+
+
+@app.delete("/bookings/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_booking(booking_id: int, db: Session = Depends(get_db)):
+    """Cancel a booking, freeing up the slot for someone else."""
+    booking = db.query(models.Booking).filter(models.Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    # Find the slot and free it up
+    slot = db.query(models.Slot).filter(models.Slot.id == booking.slot_id).first()
+    if slot:
+        slot.is_booked = False
+    
+    # Delete the booking record
+    db.delete(booking)
+    db.commit()
+    return None
