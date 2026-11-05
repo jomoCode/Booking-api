@@ -21,6 +21,7 @@ class Booking(Base):
     slot_id = Column(Integer, ForeignKey("slots.id"), unique=True, nullable=False)
     patient_name = Column(String, nullable=False)
     patient_email = Column(String, nullable=False)
+    idempotency_key = Column(String, unique=True, index=True, nullable=True)
 
     # Relationship to slot
     slot = relationship("Slot", back_populates="booking")

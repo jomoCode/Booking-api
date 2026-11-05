@@ -48,27 +48,39 @@ def list_available_slots(db: Session = Depends(get_db)):
 
 
 @app.post("/bookings", response_model=schemas.BookingResponse, status_code=status.HTTP_201_CREATED)
-def create_booking(booking_in: schemas.BookingCreate, db: Session = Depends(get_db)):
-    """Book an available slot with atomic concurrency protection."""
+def create_booking(
+    booking_in: schemas.BookingCreate, 
+    db: Session = Depends(get_db),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")
+):
+    """Book a slot safely with idempotency support via headers."""
     
-    # ATOMIC UPDATE CHECK: Try to claim the slot only if it is currently unbooked.
+    # If a key was provided, check if we already processed this request
+    if idempotency_key:
+        existing_booking = db.query(models.Booking).filter(
+            models.Booking.idempotency_key == idempotency_key
+        ).first()
+        if existing_booking:
+            return existing_booking  # Return existing booking
+    
+    # ATOMIC CONCURRENCY CHECK: Claim the slot
     rows_updated = db.query(models.Slot).filter(
         models.Slot.id == booking_in.slot_id,
         models.Slot.is_booked == False
     ).update({"is_booked": True}, synchronize_session=False)
     
     if rows_updated == 0:
-        # Check slot even exists to give a precise 404 vs 400 error
         slot = db.query(models.Slot).filter(models.Slot.id == booking_in.slot_id).first()
         if not slot:
             raise HTTPException(status_code=404, detail="Slot not found")
         raise HTTPException(status_code=400, detail="This slot is already booked")
     
-    # Create new booking record on success
+    # 3. Create the booking record, storing the idempotency key if present
     db_booking = models.Booking(
         slot_id=booking_in.slot_id,
         patient_name=booking_in.patient_name,
-        patient_email=booking_in.patient_email
+        patient_email=booking_in.patient_email,
+        idempotency_key=idempotency_key
     )
     
     db.add(db_booking)
