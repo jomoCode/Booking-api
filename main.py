@@ -49,23 +49,27 @@ def list_available_slots(db: Session = Depends(get_db)):
 
 @app.post("/bookings", response_model=schemas.BookingResponse, status_code=status.HTTP_201_CREATED)
 def create_booking(booking_in: schemas.BookingCreate, db: Session = Depends(get_db)):
-    """Book an available appointment slot."""
-    # 1. Check if slot exists
-    slot = db.query(models.Slot).filter(models.Slot.id == booking_in.slot_id).first()
-    if not slot:
-        raise HTTPException(status_code=404, detail="Slot not found")
+    """Book an available slot with atomic concurrency protection."""
     
-    # 2. Check if slot is already booked
-    if slot.is_booked:
+    # ATOMIC UPDATE CHECK: Try to claim the slot only if it is currently unbooked.
+    rows_updated = db.query(models.Slot).filter(
+        models.Slot.id == booking_in.slot_id,
+        models.Slot.is_booked == False
+    ).update({"is_booked": True}, synchronize_session=False)
+    
+    if rows_updated == 0:
+        # Check slot even exists to give a precise 404 vs 400 error
+        slot = db.query(models.Slot).filter(models.Slot.id == booking_in.slot_id).first()
+        if not slot:
+            raise HTTPException(status_code=404, detail="Slot not found")
         raise HTTPException(status_code=400, detail="This slot is already booked")
     
-    # 3. Create booking and mark slot as booked
+    # Create new booking record on success
     db_booking = models.Booking(
         slot_id=booking_in.slot_id,
         patient_name=booking_in.patient_name,
         patient_email=booking_in.patient_email
     )
-    slot.is_booked = True
     
     db.add(db_booking)
     db.commit()
