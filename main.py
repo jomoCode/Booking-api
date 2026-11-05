@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query, Header
+from fastapi import FastAPI, Depends, HTTPException, status, Query, Header, Request
 from sqlalchemy.orm import Session
-from database import engine, Base, get_db, SessionLocal
+from database import engine, Base, get_db, SessionLocal, ensure_database_schema
 import models
 import schemas
 from datetime import datetime, timedelta
 from auth import verify_api_key
+from fastapi.middleware.cors import CORSMiddleware
 
 # SlowApi
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -16,12 +17,21 @@ limiter = Limiter(key_func=get_remote_address)
 
 # Create database tables on startup
 Base.metadata.create_all(bind=engine)
+ensure_database_schema()
 
 app = FastAPI(
     title="Clinic Booking API",
     description="API for patients to view slots, book appointments, and manage bookings.",
     version="1.0.0",
-    dependencies=[Depends(verify_api_key)],
+)
+
+# Allow the browser-based clinic website to call the API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Attach rate limiter state and exception handler to FastAPI app
@@ -72,6 +82,7 @@ def list_available_slots(db: Session = Depends(get_db)):
 )
 @limiter.limit("5/minute")
 def create_booking(
+    request: Request,
     booking_in: schemas.BookingCreate,
     db: Session = Depends(get_db),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
@@ -116,38 +127,43 @@ def create_booking(
     db.refresh(db_booking)
     return db_booking
 
-@app.post("/slots/reset", response_model=list[schemas.SlotResponse], status_code=status.HTTP_201_CREATED)
+
+@app.post(
+    "/slots/reset",
+    response_model=list[schemas.SlotResponse],
+    status_code=status.HTTP_201_CREATED,
+)
 def reset_and_replace_slots(
     payload: schemas.SlotReplaceRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _api_key: str = Depends(verify_api_key),
 ):
     """Deletes every booking and replaces all slots with the ones provided (including past slots)."""
-    
+
     # 1. Delete all bookings first to avoid foreign key violations
     db.query(models.Booking).delete()
-    
+
     # 2. Delete all existing slots
     db.query(models.Slot).delete()
-    
+
     # 3. Insert the new slots supplied in the request payload
     created_slots = []
     for slot_data in payload.slots:
         db_slot = models.Slot(
             start_time=slot_data.start_time,
             end_time=slot_data.end_time,
-            is_booked=False
+            is_booked=False,
         )
         db.add(db_slot)
         created_slots.append(db_slot)
-        
+
     db.commit()
-    
+
     # Refresh to populate database-generated IDs
     for slot in created_slots:
         db.refresh(slot)
-        
-    return created_slots
 
+    return created_slots
 
 
 @app.get("/bookings", response_model=list[schemas.BookingResponse])
