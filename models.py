@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
+from datetime import datetime
+from pydantic import BaseModel
 
 class Slot(Base):
     __tablename__ = "slots"
@@ -25,3 +27,10 @@ class Booking(Base):
 
     # Relationship to slot
     slot = relationship("Slot", back_populates="booking")
+
+class SlotCreate(BaseModel):
+    start_time: datetime
+    end_time: datetime
+
+class SlotReplaceRequest(BaseModel):
+    slots: list[SlotCreate]
