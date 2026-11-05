@@ -1,5 +1,9 @@
-from fastapi import FastAPI
-from database import engine, Base
+from fastapi import FastAPI, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from database import engine, Base, get_db, SessionLocal
+import models
+import schemas
+from datetime import datetime, timedelta
 
 # Create database tables on startup
 Base.metadata.create_all(bind=engine)
@@ -13,3 +17,61 @@ app = FastAPI(
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the Clinic Booking API! Head to /docs for the interactive documentation."}
+
+# Helper function to seed sample slots on startup if none exist
+@app.on_event("startup")
+def seed_slots():
+    db = SessionLocal()  # Directly create a session instance
+    try:
+        existing_slots = db.query(models.Slot).count()
+        if existing_slots == 0:
+            now = datetime.utcnow().replace(minute=0, second=0, microsecond=0) + timedelta(days=1)
+            # Create 5 hourly slots for tomorrow
+            for i in range(5):
+                start = now + timedelta(hours=i)
+                end = start + timedelta(minutes=45)
+                db.add(models.Slot(start_time=start, end_time=end, is_booked=False))
+            db.commit()
+    finally:
+        db.close()
+
+@app.get("/slots", response_model=list[schemas.SlotResponse])
+def list_available_slots(db: Session = Depends(get_db)):
+    """List all unbooked appointment slots."""
+    slots = db.query(models.Slot).filter(models.Slot.is_booked == False).all()
+    return slots
+
+
+@app.post("/bookings", response_model=schemas.BookingResponse, status_code=status.HTTP_201_CREATED)
+def create_booking(booking_in: schemas.BookingCreate, db: Session = Depends(get_db)):
+    """Book an available appointment slot."""
+    # 1. Check if slot exists
+    slot = db.query(models.Slot).filter(models.Slot.id == booking_in.slot_id).first()
+    if not slot:
+        raise HTTPException(status_code=404, detail="Slot not found")
+    
+    # 2. Check if slot is already booked
+    if slot.is_booked:
+        raise HTTPException(status_code=400, detail="This slot is already booked")
+    
+    # 3. Create booking and mark slot as booked
+    db_booking = models.Booking(
+        slot_id=booking_in.slot_id,
+        patient_name=booking_in.patient_name,
+        patient_email=booking_in.patient_email
+    )
+    slot.is_booked = True
+    
+    db.add(db_booking)
+    db.commit()
+    db.refresh(db_booking)
+    return db_booking
+
+
+@app.get("/bookings/{booking_id}", response_model=schemas.BookingResponse)
+def get_booking(booking_id: int, db: Session = Depends(get_db)):
+    """Look up a booking by its ID."""
+    booking = db.query(models.Booking).filter(models.Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    return booking
