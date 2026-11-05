@@ -4,6 +4,8 @@ from database import engine, Base, get_db, SessionLocal
 import models
 import schemas
 from datetime import datetime, timedelta
+from auth import verify_api_key
+
 
 # Create database tables on startup
 Base.metadata.create_all(bind=engine)
@@ -11,7 +13,8 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Clinic Booking API",
     description="API for patients to view slots, book appointments, and manage bookings.",
-    version="1.0.0"
+    version="1.0.0",
+    dependencies=[Depends(verify_api_key)]
 )
 
 @app.get("/")
@@ -32,6 +35,8 @@ def seed_slots():
                 end = start + timedelta(minutes=45)
                 db.add(models.Slot(start_time=start, end_time=end, is_booked=False))
             db.commit()
+        else:
+            print("slots already created")
     finally:
         db.close()
 
