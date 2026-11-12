@@ -829,7 +829,11 @@
 
       createApp({
         setup() {
-          const API_BASE = "http://127.0.0.1:8000";
+          // Local dev hits the local API; anywhere else hits the Render API.
+          // Replace the URL below with your Render service URL after deploying.
+          const API_BASE = ["localhost", "127.0.0.1", ""].includes(location.hostname)
+            ? "http://127.0.0.1:8000"
+            : "https://clinic-booking-api.onrender.com";
           const ADMIN_API_KEY = "my-secret-clinic-key-123";
 
           // Navigation tab state: 'booking' | 'lookup' | 'admin'

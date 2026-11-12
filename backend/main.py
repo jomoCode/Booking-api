@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, Depends, HTTPException, status, Query, Header, Request
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db, SessionLocal, ensure_database_schema
@@ -26,9 +28,15 @@ app = FastAPI(
 )
 
 # Allow the browser-based clinic website to call the API.
+# On Render, set CORS_ORIGINS to your frontend URL(s), comma-separated,
+# e.g. "https://my-clinic.onrender.com". Defaults to allowing everything.
+cors_origins = [
+    origin.strip() for origin in os.getenv("CORS_ORIGINS", "*").split(",") if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

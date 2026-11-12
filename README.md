@@ -29,16 +29,27 @@ A REST API for viewing clinic appointment slots and creating, listing, and cance
 
 ```text
 clinic-booking-api/
-├── auth.py
-├── database.py
-├── main.py
-├── models.py
-├── schemas.py
-├── clinic.db
-├── venv/
+├── backend/            # standalone FastAPI service (deployed to Render)
+│   ├── auth.py
+│   ├── database.py
+│   ├── main.py
+│   ├── models.py
+│   ├── schemas.py
+│   └── requirements.txt
+├── frontend/
+│   └── index.html      # static site that calls the API
+├── render.yaml         # Render Blueprint (API + Postgres)
 ├── .gitignore
 └── README.md
 ```
+
+### Environment variables (backend)
+
+| Variable        | Default                    | Purpose                                   |
+| --------------- | -------------------------- | ----------------------------------------- |
+| `DATABASE_URL`  | `sqlite:///./clinic.db`    | Database connection (Postgres on Render)  |
+| `ADMIN_API_KEY` | dev key                    | Key required by `POST /slots/reset`       |
+| `CORS_ORIGINS`  | `*`                        | Comma-separated allowed frontend origins  |
 
 ## Installation
 
@@ -65,12 +76,13 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 ### 3. Install dependencies
 
 ```powershell
-pip install fastapi uvicorn sqlalchemy pydantic email-validator slowapi
+pip install -r backend/requirements.txt
 ```
 
 ### 4. Start the API
 
 ```powershell
+cd backend
 uvicorn main:app --reload
 ```
 

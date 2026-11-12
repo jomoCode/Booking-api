@@ -1,0 +1,25 @@
+# Render Blueprint: New > Blueprint in the Render dashboard, then pick this repo.
+services:
+  - type: web
+    name: clinic-booking-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.6
+      - key: DATABASE_URL
+        fromDatabase:
+          name: clinic-db
+          property: connectionString
+      - key: ADMIN_API_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*" # change to your frontend URL once it's deployed
+
+databases:
+  - name: clinic-db
+    plan: free
