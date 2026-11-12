@@ -66,6 +66,57 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #0f766e;
       }
+
+      /* Vibrant pulsating success notification */
+      .notify-success {
+        background: linear-gradient(90deg, #059669, #14b8a6, #10b981);
+        background-size: 200% 100%;
+        border: 2px solid #34d399;
+        animation:
+          notify-pulse 1.6s ease-in-out infinite,
+          notify-shimmer 3s linear infinite;
+      }
+      .notify-success .notify-icon {
+        animation: notify-icon-pop 1.6s ease-in-out infinite;
+      }
+      @keyframes notify-pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          box-shadow:
+            0 0 0 0 rgba(16, 185, 129, 0.7),
+            0 4px 14px rgba(16, 185, 129, 0.35);
+        }
+        50% {
+          transform: scale(1.015);
+          box-shadow:
+            0 0 0 10px rgba(16, 185, 129, 0),
+            0 6px 24px rgba(16, 185, 129, 0.6);
+        }
+      }
+      @keyframes notify-shimmer {
+        0% {
+          background-position: 0% 50%;
+        }
+        100% {
+          background-position: 200% 50%;
+        }
+      }
+      @keyframes notify-icon-pop {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.3);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .notify-success,
+        .notify-success .notify-icon {
+          animation: none;
+        }
+      }
     </style>
   </head>
   <body
@@ -208,11 +259,12 @@
         class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 w-full"
       >
         <div
-          :class="messageType === 'error' ? 'bg-red-600 text-white border border-red-900' : 'bg-teal-600 text-white border border-teal-800'"
-          class="p-4 shadow flex justify-between items-center"
+          :key="message"
+          :class="messageType === 'error' ? 'bg-red-600 text-white border border-red-900 shadow' : 'notify-success text-white'"
+          class="p-4 flex justify-between items-center"
         >
           <div class="flex items-center gap-3">
-            <span class="font-black text-xl"
+            <span class="notify-icon inline-block font-black text-xl"
               >{{ messageType === 'error' ? '✖' : '✔' }}</span
             >
             <span class="font-bold uppercase text-sm tracking-wide"
