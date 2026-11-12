@@ -8,9 +8,12 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 # so a SQLite file there would lose all bookings).
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./clinic.db")
 
-# Render/Heroku hand out "postgres://" URLs; SQLAlchemy needs "postgresql://".
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+# Render hands out "postgres://" or "postgresql://" URLs. Pin the driver to
+# psycopg (v3) explicitly so SQLAlchemy doesn't guess which one to import.
+for prefix in ("postgres://", "postgresql://"):
+    if DATABASE_URL.startswith(prefix):
+        DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len(prefix):]
+        break
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
