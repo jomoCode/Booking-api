@@ -81,7 +81,7 @@
             <!-- BRAND LOGO -->
             <div
               class="flex items-center gap-4 cursor-pointer"
-              @click="activeTab = 'booking'"
+              @click="openTab('booking')"
             >
               <div
                 class="w-12 h-12 bg-teal-600 flex items-center justify-center shadow transition-transform hover:scale-105"
@@ -137,7 +137,7 @@
           <!-- NAVIGATION TABS -->
           <nav class="flex overflow-x-auto border-t border-slate-200 mt-2">
             <button
-              @click="activeTab = 'booking'"
+              @click="openTab('booking')"
               :class="activeTab === 'booking' ? 'border-b-2 border-teal-600 text-slate-900 bg-teal-50 font-black' : 'border-b-2 border-transparent text-slate-600 hover:text-slate-900 font-bold hover:bg-slate-100'"
               class="px-6 py-4 text-sm uppercase tracking-wider transition-all duration-150 flex items-center gap-2"
             >
@@ -158,7 +158,7 @@
             </button>
 
             <button
-              @click="activeTab = 'lookup'"
+              @click="openTab('lookup')"
               :class="activeTab === 'lookup' ? 'border-b-2 border-teal-600 text-slate-900 bg-teal-50 font-black' : 'border-b-2 border-transparent text-slate-600 hover:text-slate-900 font-bold hover:bg-slate-100'"
               class="px-6 py-4 text-sm uppercase tracking-wider transition-all duration-150 flex items-center gap-2"
             >
@@ -179,7 +179,7 @@
             </button>
 
             <button
-              @click="activeTab = 'admin'"
+              @click="openTab('admin')"
               :class="activeTab === 'admin' ? 'border-b-2 border-teal-600 text-slate-900 bg-teal-50 font-black' : 'border-b-2 border-transparent text-slate-600 hover:text-slate-900 font-bold hover:bg-slate-100'"
               class="px-6 py-4 text-sm uppercase tracking-wider transition-all duration-150 flex items-center gap-2"
             >
@@ -947,6 +947,7 @@
             try {
               const res = await fetch(`${API_BASE}/slots`, {
                 headers: getHeaders(),
+                cache: "no-store",
               });
               if (!res.ok) throw new Error("API Offline - Loaded local slots");
               slots.value = await res.json();
@@ -954,8 +955,7 @@
               if (slots.value.length === 0) {
                 slots.value = [...mockSlots];
               }
-            }
-            flex: {
+            } finally {
               loadingSlots.value = false;
             }
           };
@@ -965,15 +965,30 @@
             try {
               const res = await fetch(`${API_BASE}/bookings`, {
                 headers: getHeaders(),
+                cache: "no-store",
               });
               if (res.ok) {
                 allBookings.value = await res.json();
+                // Keep the looked-up booking card in sync with fresh data
+                if (lookedUpBooking.value) {
+                  lookedUpBooking.value =
+                    allBookings.value.find(
+                      (b) => b.id === lookedUpBooking.value.id,
+                    ) || null;
+                }
               }
             } catch (err) {
               if (allBookings.value.length === 0) {
                 allBookings.value = [...mockBookings];
               }
             }
+          };
+
+          // Switch tab and pull the latest data from the API
+          const openTab = (tab) => {
+            activeTab.value = tab;
+            fetchSlots();
+            fetchAllBookings();
           };
 
           // Computed Filtered Slots
@@ -1215,6 +1230,7 @@
 
           return {
             activeTab,
+            openTab,
             slots,
             allBookings,
             loadingSlots,
