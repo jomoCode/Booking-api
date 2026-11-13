@@ -3,9 +3,7 @@ import os
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Locally this falls back to SQLite. On Render, set DATABASE_URL to the
-# Postgres connection string (Render's disk is wiped on every deploy/restart,
-# so a SQLite file there would lose all bookings).
+# Fall back to sqlite when database-url is missing
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./clinic.db")
 
 # Render hands out "postgres://" or "postgresql://" URLs. Pin the driver to

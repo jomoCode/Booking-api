@@ -192,6 +192,18 @@ def list_bookings(
     return bookings
 
 
+@app.delete("/bookings", status_code=status.HTTP_204_NO_CONTENT)
+def delete_all_bookings(
+    db: Session = Depends(get_db),
+    _api_key: str = Depends(verify_api_key),
+):
+    """Delete every booking and reopen all slots (admin only)."""
+    db.query(models.Booking).delete(synchronize_session=False)
+    db.query(models.Slot).update({"is_booked": False}, synchronize_session=False)
+    db.commit()
+    return None
+
+
 @app.get("/bookings/{booking_id}", response_model=schemas.BookingResponse)
 def get_booking(booking_id: int, db: Session = Depends(get_db)):
     """Look up a booking by its ID."""

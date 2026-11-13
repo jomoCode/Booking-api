@@ -1172,19 +1172,26 @@
           };
 
           // Purge All Bookings
-          const purgeAllBookings = () => {
-            allBookings.value.forEach((b) => {
-              if (b.slot) {
-                slots.value.push({
-                  id: b.slot.id || Date.now(),
-                  start_time: b.slot.start_time,
-                });
+          const purgeAllBookings = async () => {
+            if (!confirm("Delete ALL bookings? This cannot be undone.")) return;
+            try {
+              const res = await fetch(`${API_BASE}/bookings`, {
+                method: "DELETE",
+                headers: getHeaders(null, ADMIN_API_KEY),
+              });
+              if (!res.ok) {
+                const result = await res.json().catch(() => ({}));
+                throw new Error(result.detail || `Request failed (${res.status})`);
               }
-            });
-            allBookings.value = [];
-            lookedUpBooking.value = null;
-            message.value = "All customer bookings have been purged.";
-            messageType.value = "success";
+              allBookings.value = [];
+              lookedUpBooking.value = null;
+              await Promise.all([fetchSlots(), fetchAllBookings()]);
+              message.value = "All customer bookings have been purged.";
+              messageType.value = "success";
+            } catch (err) {
+              message.value = `Could not clear bookings: ${err.message}`;
+              messageType.value = "error";
+            }
           };
 
           const addScheduleSlot = () => {

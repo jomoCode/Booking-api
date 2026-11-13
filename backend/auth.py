@@ -3,7 +3,7 @@ import os
 from fastapi import HTTPException, Security, status
 from fastapi.security.api_key import APIKeyHeader
 
-# Set ADMIN_API_KEY in Render's environment settings. The default is only for local dev.
+# This project is for demo purpose only, so default is also the live key.
 API_KEY = os.getenv("ADMIN_API_KEY", "my-secret-clinic-key-123")
 API_KEY_NAME = "x-api-key"
 
