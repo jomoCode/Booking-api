@@ -256,12 +256,14 @@
       <!-- GLOBAL NOTIFICATION BANNER -->
       <div
         v-if="message"
-        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 w-full"
+        class="fixed top-4 inset-x-0 z-[100] px-4 flex justify-center pointer-events-none"
+        role="status"
+        aria-live="polite"
       >
         <div
           :key="message"
-          :class="messageType === 'error' ? 'bg-red-600 text-white border border-red-900 shadow' : 'notify-success text-white'"
-          class="p-4 flex justify-between items-center"
+          :class="messageType === 'error' ? 'bg-red-600 text-white border border-red-900' : 'notify-success text-white'"
+          class="pointer-events-auto w-full max-w-2xl p-4 flex justify-between items-center gap-4 shadow-2xl"
         >
           <div class="flex items-center gap-3">
             <span class="notify-icon inline-block font-black text-xl"
@@ -765,7 +767,7 @@
       <!-- BOOKING MODAL (ZERO ROUNDED CORNERS) -->
       <div
         v-if="showModal"
-        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex justify-center items-center p-4 z-50"
+        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex justify-center items-center p-4 z-[90]"
       >
         <div
           class="bg-white border border-slate-900 max-w-lg w-full p-6 sm:p-8 shadow-2xl relative"
